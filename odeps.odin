@@ -32,10 +32,11 @@ main :: proc() {
 			if strings.has_suffix(path, "/") {
 				path = path[:len(path) - 1]
 			}
-			target_dir := filepath.base(path)
+			repo_name := filepath.base(path)
+			target_dir := repo_name
 
 			if len(os.args) >= 3 {
-				target_dir = os.args[2]
+				target_dir = filepath.join({os.args[2], repo_name})
 			}
 
 			fmt.println("Downloading contents from:", contents_url)
