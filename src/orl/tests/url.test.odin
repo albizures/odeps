@@ -1,6 +1,6 @@
 package url_tests
 
-import src "../src/url"
+import "../src"
 import "core:testing"
 
 @(test)
@@ -28,11 +28,11 @@ test_url_to_string :: proc(t: ^testing.T) {
 		"https://user:pass@example.com:443/out/in?q=1#top",
 		context.temp_allocator,
 	)
-	str := src.to_string(url, context.temp_allocator)
+	str := src.url_to_string(url, context.temp_allocator)
 	testing.expect_value(t, str, "https://user:pass@example.com:443/out/in?q=1#top")
 
 	url2, _ := src.parse_url("http://example.com", context.temp_allocator)
-	str2 := src.to_string(url2, context.temp_allocator)
+	str2 := src.url_to_string(url2, context.temp_allocator)
 	testing.expect_value(t, str2, "http://example.com")
 
 
