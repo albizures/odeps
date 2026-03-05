@@ -7,6 +7,26 @@ import "core:path/filepath"
 import "core:strings"
 import "vendor:curl"
 
+
+Github_Content_Type :: enum {
+	File,
+	Dir,
+}
+
+Github_Content_Item :: struct {
+	name:         string `json:"name"`,
+	type_str:     string `json:"type"`,
+	download_url: string `json:"download_url"`,
+	url:          string `json:"url"`,
+	type:         Github_Content_Type `json:"-"`,
+}
+
+Github_Parse_Error :: enum {
+	None,
+	Invalid_JSON,
+	Not_An_Array,
+}
+
 // Helper to recursively download folder contents
 download_folder_contents :: proc(url: string, target_dir: string, token: string = "") -> bool {
 	data, ok := fetch_url(url, token)
@@ -20,53 +40,70 @@ download_folder_contents :: proc(url: string, target_dir: string, token: string 
 		os.make_directory(target_dir)
 	}
 
-	json_data, err := json.parse(
-		transmute([]byte)data,
-		json.DEFAULT_SPECIFICATION,
-		parse_integers = false,
-		allocator = context.temp_allocator,
-	)
-	if err != nil {
-		fmt.eprintln("Failed to parse JSON:", err)
+	items, err := parse_github_contents(data, context.temp_allocator)
+	if err != .None {
+		fmt.eprintln("Failed to parse GitHub contents:", err)
 		return false
 	}
 
-	if json_arr, is_array := json_data.(json.Array); is_array {
-		for item in json_arr {
-			if obj, is_obj := item.(json.Object); is_obj {
-				type_str := obj["type"].(json.String)
-				name_str := obj["name"].(json.String)
+	for item in items {
+		item_path := filepath.join({target_dir, item.name})
+		defer delete(item_path)
 
-				item_path := filepath.join({target_dir, name_str})
-				defer delete(item_path)
-
-				if type_str == "file" {
-					download_url := obj["download_url"].(json.String)
-					fmt.println("Downloading file:", item_path)
-
-					file_data, file_ok := fetch_url(download_url, token)
-					if file_ok {
-						os.write_entire_file(item_path, transmute([]byte)file_data)
-						delete(file_data)
-					} else {
-						fmt.eprintln("Failed to download file:", download_url)
-					}
-				} else if type_str == "dir" {
-					dir_url := obj["url"].(json.String)
-					fmt.println("Entering directory:", item_path)
-					download_folder_contents(dir_url, item_path, token)
-				}
+		switch item.type {
+		case .File:
+			fmt.println("Downloading file:", item_path)
+			file_data, file_ok := fetch_url(item.download_url, token)
+			if file_ok {
+				os.write_entire_file(item_path, transmute([]byte)file_data)
+				delete(file_data)
+			} else {
+				fmt.eprintln("Failed to download file:", item.download_url)
 			}
+		case .Dir:
+			fmt.println("Entering directory:", item_path)
+			download_folder_contents(item.url, item_path, token)
 		}
-		return true
-	} else if obj, is_obj := json_data.(json.Object); is_obj {
-		// Single file fallback maybe?
-		fmt.eprintln("Got object instead of array, might not be a directory")
-		return false
 	}
 
-	return false
+	return true
 }
+
+parse_github_contents :: proc(
+	data: string,
+	allocator := context.allocator,
+) -> (
+	[]Github_Content_Item,
+	Github_Parse_Error,
+) {
+	items: []Github_Content_Item
+	err := json.unmarshal(transmute([]byte)data, &items, json.DEFAULT_SPECIFICATION, allocator)
+
+	if err != nil {
+		#partial switch v in err {
+		case json.Error:
+			return nil, .Invalid_JSON
+		case json.Unmarshal_Data_Error:
+			return nil, .Invalid_JSON
+		case json.Unsupported_Type_Error:
+			return nil, .Not_An_Array
+		case:
+			return nil, .Invalid_JSON
+		}
+	}
+
+	// Post-process to set the enum type based on the string
+	for &item in items {
+		if item.type_str == "file" {
+			item.type = .File
+		} else if item.type_str == "dir" {
+			item.type = .Dir
+		}
+	}
+
+	return items, .None
+}
+
 
 // Fetch data from a URL using GitHub API headers
 // curl -H "Authorization: token YOUR_TOKEN" \
