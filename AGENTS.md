@@ -8,16 +8,16 @@ This file contains guidelines and commands for agentic coding agents working in 
 
 ```bash
 # Build the main executable
-odin build src/main.odin
+odin build .
 
 # Build and run directly
-odin run src/main.odin
+odin run .
 
 # Check syntax and type errors without building
-odin check src/
+odin check .
 
 # Generate documentation
-odin doc src/
+odin doc .
 ```
 
 ### Testing

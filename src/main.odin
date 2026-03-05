@@ -3,46 +3,9 @@ package odeps_core
 import "base:runtime"
 import "core:c"
 import "core:fmt"
-import "core:os"
 import "core:strings"
 import "orl"
 import "vendor:curl"
-
-
-// curl -H "Authorization: token YOUR_TOKEN" \
-//      -H "Accept: application/vnd.github.v3.raw" \
-//      -L -O "https://api.github.com/repos/username/repo-name/contents/path/to/file?ref=commit_hash"
-
-main :: proc() {
-	argv := os.args[1:]
-	// fmt.println(argv)
-
-	if !is_folder(argv[0]) {
-		fmt.eprintln("Url expected to be a folder")
-		return
-	}
-
-	commit, ok := get_commit(argv[0])
-	if ok {
-		fmt.println("Latest commit:", commit)
-		
-		contents_url, url_ok := get_contents_url(argv[0], commit)
-		if url_ok {
-			fmt.println("Downloading contents from:", contents_url)
-			data, dl_ok := download_folder(contents_url)
-			if dl_ok {
-				fmt.println("Downloaded data successfully!")
-				fmt.println(data)
-			} else {
-				fmt.eprintln("Failed to download folder data.")
-			}
-		} else {
-			fmt.eprintln("Failed to construct contents URL")
-		}
-	} else {
-		fmt.println("Failed to get commit")
-	}
-}
 
 get_contents_url :: proc(raw_url: string, commit: string) -> (string, bool) {
 	url, _ := orl.parse_url(raw_url)
@@ -75,7 +38,6 @@ is_folder :: proc(url: string) -> bool {
 	// this could fail if the there is a files named tree 🤷‍♂️
 	return strings.contains(url, "/tree/")
 }
-
 
 Curl_Data :: struct {
 	b:   ^strings.Builder,
@@ -189,7 +151,7 @@ convert_link_to_api :: proc(raw_url: string) -> (string, bool) {
 
 	params := make([dynamic]orl.Query_Param, context.temp_allocator)
 	orl.append(&params, "path", file_path)
-	orl.append(&params, "branch", file_path)
+	orl.append(&params, "sha", branch)
 	orl.append(&params, "per_page", "1")
 
 
@@ -202,45 +164,3 @@ convert_link_to_api :: proc(raw_url: string) -> (string, bool) {
 
 	return api_url, true
 }
-
-// Download a folder (or file) from GitHub API using the provided URL
-download_folder :: proc(url: string, token: string = "", allocator := context.allocator) -> (string, bool) {
-	h := curl.easy_init()
-	if h == nil {
-		fmt.eprintln("Unable to initialize curl")
-		return "", false
-	}
-	defer curl.easy_cleanup(h)
-
-	b := strings.builder_make(allocator)
-	data := Curl_Data{&b, context}
-
-	curl.easy_setopt(h, .URL, strings.clone_to_cstring(url, context.temp_allocator))
-	curl.easy_setopt(h, .WRITEFUNCTION, write_callback)
-	curl.easy_setopt(h, .WRITEDATA, &data)
-	
-	// -L equivalent
-	curl.easy_setopt(h, .FOLLOWLOCATION, 1)
-
-	headers: ^curl.slist = nil
-	headers = curl.slist_append(headers, "User-Agent: Odin-Request")
-	headers = curl.slist_append(headers, "Accept: application/vnd.github.v3.raw")
-	
-	if token != "" {
-		auth_header := fmt.tprintf("Authorization: token %s", token)
-		headers = curl.slist_append(headers, strings.clone_to_cstring(auth_header, context.temp_allocator))
-	}
-	
-	defer curl.slist_free_all(headers)
-	curl.easy_setopt(h, .HTTPHEADER, headers)
-
-	res := curl.easy_perform(h)
-	if res != .E_OK {
-		fmt.eprintln("Curl failed:", curl.easy_strerror(res))
-		strings.builder_destroy(&b)
-		return "", false
-	}
-
-	return strings.to_string(b), true
-}
-
