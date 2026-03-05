@@ -11,16 +11,18 @@ get_contents_url :: proc(raw_url: string, commit: string) -> (string, bool) {
 	url, _ := orl.parse_url(raw_url)
 	parts := strings.split(url.path, "/", context.temp_allocator)
 
-	if len(parts) < 5 || parts[3] != "tree" {
+	if len(parts) < 3 {
 		return "", false
 	}
 
 	user := parts[1]
 	repo := parts[2]
-
 	file_path := ""
-	if len(parts) > 5 {
-		file_path = strings.join(parts[5:], "/", context.temp_allocator)
+
+	if len(parts) >= 5 && parts[3] == "tree" {
+		if len(parts) > 5 {
+			file_path = strings.join(parts[5:], "/", context.temp_allocator)
+		}
 	}
 
 	api_url := fmt.tprintf(
@@ -35,8 +37,19 @@ get_contents_url :: proc(raw_url: string, commit: string) -> (string, bool) {
 }
 
 is_folder :: proc(url: string) -> bool {
-	// this could fail if the there is a files named tree 🤷‍♂️
-	return strings.contains(url, "/tree/")
+	parsed, errs := orl.parse_url(url)
+	if len(errs) > 0 {
+		return false
+	}
+
+	if !strings.contains(parsed.domain, "github.com") {
+		return false
+	}
+
+	parts := strings.split(parsed.path, "/", context.temp_allocator)
+	// Example parts for repo root: ["", "user", "repo"] - length 3
+	// Example parts for folder: ["", "user", "repo", "tree", "branch", "path"] - length >= 5
+	return len(parts) >= 3
 }
 
 Curl_Data :: struct {
@@ -133,27 +146,33 @@ convert_link_to_api :: proc(raw_url: string) -> (string, bool) {
 	url, _ := orl.parse_url(raw_url)
 	parts := strings.split(url.path, "/", context.temp_allocator)
 
-	if len(parts) < 5 || parts[3] != "tree" {
+	if len(parts) < 3 {
 		fmt.eprintln(
-			"Invalid GitHub folder link. Expected format: https://github.com/User/Repo/tree/Branch/[Path]",
+			"Invalid GitHub link. Expected format: https://github.com/User/Repo or https://github.com/User/Repo/tree/Branch/[Path]",
 		)
 		return "", false
 	}
 
 	user := parts[1]
 	repo := parts[2]
-	branch := parts[4]
-
+	branch := ""
 	file_path := ""
-	if len(parts) > 5 {
-		file_path = strings.join(parts[5:], "/", context.temp_allocator)
+
+	if len(parts) >= 5 && parts[3] == "tree" {
+		branch = parts[4]
+		if len(parts) > 5 {
+			file_path = strings.join(parts[5:], "/", context.temp_allocator)
+		}
 	}
 
 	params := make([dynamic]orl.Query_Param, context.temp_allocator)
-	orl.append(&params, "path", file_path)
-	orl.append(&params, "sha", branch)
+	if file_path != "" {
+		orl.append(&params, "path", file_path)
+	}
+	if branch != "" {
+		orl.append(&params, "sha", branch)
+	}
 	orl.append(&params, "per_page", "1")
-
 
 	api_url := fmt.tprintf(
 		"https://api.github.com/repos/%s/%s/commits?%s",

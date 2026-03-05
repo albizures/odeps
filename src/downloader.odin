@@ -68,7 +68,6 @@ download_folder_contents :: proc(url: string, target_dir: string, token: string 
 	return false
 }
 
-
 // Fetch data from a URL using GitHub API headers
 // curl -H "Authorization: token YOUR_TOKEN" \
 //      -H "Accept: application/vnd.github.v3.raw" \

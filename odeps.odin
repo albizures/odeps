@@ -3,6 +3,7 @@ package odeps
 import "core:fmt"
 import "core:os"
 import "core:path/filepath"
+import "core:strings"
 import "src"
 import "src/orl"
 
@@ -27,7 +28,11 @@ main :: proc() {
 		contents_url, url_ok := src.get_contents_url(url, commit)
 		if url_ok {
 			url_parts, _ := orl.parse_url(url)
-			target_dir := filepath.base(url_parts.path)
+			path := url_parts.path
+			if strings.has_suffix(path, "/") {
+				path = path[:len(path) - 1]
+			}
+			target_dir := filepath.base(path)
 
 			if len(os.args) >= 3 {
 				target_dir = os.args[2]
