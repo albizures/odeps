@@ -1,6 +1,7 @@
 package cli
 
 import "../github"
+import "../lock"
 import "../orl"
 import "core:fmt"
 import "core:path/filepath"
@@ -44,6 +45,12 @@ handle_add :: proc(cmd: Add_Command) {
 	dl_ok := github.download_folder_contents(contents_url, target_dir)
 	if dl_ok {
 		fmt.println("Downloaded data successfully!")
+		
+		if lock.add_dependency(target_dir, cmd.url, commit) {
+			fmt.println("Updated odeps-lock.tome successfully")
+		} else {
+			fmt.eprintln("Failed to update odeps-lock.tome")
+		}
 	} else {
 		fmt.eprintln("Failed to download folder data.")
 	}
