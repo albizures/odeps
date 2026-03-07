@@ -12,7 +12,7 @@ main :: proc() {
 
 	url := os.args[1]
 	cmd := cli.parse_argv(os.args[1:])
-	fmt.println(cmd)
+
 	switch v in cmd {
 	case cli.Add_Command:
 		cli.handle_add(v)
