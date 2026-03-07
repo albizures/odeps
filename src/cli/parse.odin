@@ -22,7 +22,7 @@ Command :: union {
 }
 
 parse_argv :: proc(argv: []string) -> Command {
-	if len(argv) < 2 {
+	if len(argv) < 1 {
 		print_usage()
 		os.exit(0)
 	}

@@ -93,7 +93,7 @@ get_token :: proc(t: ^Tokenizer, loc := #caller_location) -> (token: Token) {
 		value := consume_string(t)
 		token.end = t.index
 		token.kind = .String
-	case '\n', ' ':
+	case '\n', ' ', '\t', '\r':
 		consume_rune(t)
 		// maybe it would be better to ignore whitespace in the beginning
 		return get_token(t)

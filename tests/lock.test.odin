@@ -61,3 +61,22 @@ test_lock_add_dependency :: proc(t: ^testing.T) {
 	folder2, _ := dep2["folder"].(src.String)
 	testing.expect_value(t, string(folder2), "vendor/bar")
 }
+
+@(test)
+test_lock_update_dependency :: proc(t: ^testing.T) {
+	os.remove(LOCK_FILE_NAME)
+	defer os.remove(LOCK_FILE_NAME)
+	defer free_all(context.temp_allocator)
+
+	ok := lock.add_dependency("vendor/foo", "https://github.com/user/foo", "old_commit")
+	testing.expect(t, ok, "Failed to add initial dependency")
+
+	updated := lock.update_dependency("vendor/foo", "new_commit")
+	testing.expect(t, updated, "Failed to update dependency")
+
+	deps, get_ok := lock.get_dependencies(context.temp_allocator)
+	testing.expect(t, get_ok, "Failed to get dependencies")
+	testing.expect_value(t, len(deps), 1)
+	testing.expect_value(t, deps[0].folder, "vendor/foo")
+	testing.expect_value(t, deps[0].commit, "new_commit")
+}

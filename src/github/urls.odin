@@ -77,7 +77,6 @@ write_callback :: proc "c" (
 // ref: curl -s "https://api.github.com/repos/[User]/[Repo]/commits?path=[Path_to_File]&sha=master&per_page=1" | grep '"sha"' | head -n 1
 get_commit :: proc(raw_url: string, allocator := context.allocator) -> (string, bool) {
 	api_url, ok := convert_link_to_api(raw_url)
-	defer free_all(context.temp_allocator)
 
 	if !ok {
 		fmt.eprintln("Unable to get commit")
@@ -139,6 +138,74 @@ get_commit :: proc(raw_url: string, allocator := context.allocator) -> (string, 
 
 	commit_hash := response[start_idx:start_idx + quote_end]
 	return strings.clone(commit_hash), true
+}
+
+get_compare_status :: proc(raw_url: string, current_commit: string, target_commit: string, allocator := context.allocator) -> (string, bool) {
+	url, _ := orl.parse_url(raw_url)
+	parts := strings.split(url.path, "/", context.temp_allocator)
+
+	if len(parts) < 3 {
+		return "", false
+	}
+
+	user := parts[1]
+	repo := parts[2]
+
+	api_url := fmt.tprintf(
+		"https://api.github.com/repos/%s/%s/compare/%s...%s",
+		user,
+		repo,
+		current_commit,
+		target_commit,
+	)
+
+	h := curl.easy_init()
+	if h == nil {
+		fmt.eprintln("Unable to initialize curl")
+		return "", false
+	}
+	defer curl.easy_cleanup(h)
+
+	b := strings.builder_make(context.temp_allocator)
+	data := Curl_Data{&b, context}
+
+	curl.easy_setopt(h, .URL, strings.clone_to_cstring(api_url, context.temp_allocator))
+	curl.easy_setopt(h, .WRITEFUNCTION, write_callback)
+	curl.easy_setopt(h, .WRITEDATA, &data)
+
+	headers: ^curl.slist = nil
+	headers = curl.slist_append(headers, "User-Agent: Odin-Request")
+	defer curl.slist_free_all(headers)
+	curl.easy_setopt(h, .HTTPHEADER, headers)
+
+	res := curl.easy_perform(h)
+	if res != .E_OK {
+		fmt.eprintln("Curl failed:", curl.easy_strerror(res))
+		return "", false
+	}
+
+	response := strings.to_string(b)
+
+	status_idx := strings.index(response, "\"status\":")
+	if status_idx == -1 {
+		return "", false
+	}
+
+	start_idx := status_idx + 9 // after `"status":`
+
+	quote_start := strings.index(response[start_idx:], "\"")
+	if quote_start == -1 {
+		return "", false
+	}
+	start_idx += quote_start + 1
+
+	quote_end := strings.index(response[start_idx:], "\"")
+	if quote_end == -1 {
+		return "", false
+	}
+
+	status_str := response[start_idx:start_idx + quote_end]
+	return strings.clone(status_str, allocator), true
 }
 
 
