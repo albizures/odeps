@@ -24,8 +24,13 @@ handle_add :: proc(cmd: Add_Command) {
 				path = path[:len(path) - 1]
 			}
 			repo_name := filepath.base(path) if len(cmd.name) == 0 else cmd.name
-			target_dir :=
-				repo_name if len(cmd.target) == 0 else filepath.join({cmd.target, repo_name})
+			target_dir: string
+			if len(cmd.target) == 0 {
+				target_dir = repo_name
+			} else {
+				temp_dir, _ := filepath.join({cmd.target, repo_name}, context.temp_allocator)
+				target_dir = temp_dir
+			}
 
 
 			fmt.println("Downloading contents from:", contents_url)

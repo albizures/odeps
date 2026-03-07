@@ -40,26 +40,21 @@ download_folder_contents :: proc(url: string, target_dir: string, token: string 
 		os.make_directory(target_dir)
 	}
 
-	items, err := parse_github_contents(data, context.temp_allocator)
+	items, err := parse_github_contents(data, context.allocator)
 	if err != .None {
 		fmt.eprintln("Failed to parse GitHub contents:", err)
 		return false
 	}
 
+	defer free(&items)
+
 	for item in items {
-		item_path := filepath.join({target_dir, item.name})
+		item_path, _ := filepath.join({target_dir, item.name}, context.allocator)
 		defer delete(item_path)
 
 		switch item.type {
 		case .File:
-			fmt.println("Downloading file:", item_path)
-			file_data, file_ok := fetch_url(item.download_url, token)
-			if file_ok {
-				os.write_entire_file(item_path, transmute([]byte)file_data)
-				delete(file_data)
-			} else {
-				fmt.eprintln("Failed to download file:", item.download_url)
-			}
+			save_file(item.download_url, item_path, token)
 		case .Dir:
 			fmt.println("Entering directory:", item_path)
 			download_folder_contents(item.url, item_path, token)
@@ -67,6 +62,25 @@ download_folder_contents :: proc(url: string, target_dir: string, token: string 
 	}
 
 	return true
+}
+
+
+save_file :: proc(url, path, token: string, allocator := context.allocator) {
+	fmt.println("Downloading file:", path)
+	file_data, file_ok := fetch_url(url, token)
+
+	if !file_ok {
+		fmt.eprintln("Failed to download file:", url)
+		return
+	}
+
+	defer delete(file_data)
+
+	error := os.write_entire_file(path, transmute([]byte)file_data)
+
+	if error != nil {
+		fmt.eprintln("Failed to save file:", path)
+	}
 }
 
 parse_github_contents :: proc(
