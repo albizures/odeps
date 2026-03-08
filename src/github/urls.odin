@@ -3,6 +3,7 @@ package github
 import "../orl"
 import "base:runtime"
 import "core:c"
+import "core:encoding/json"
 import "core:fmt"
 import "core:strings"
 import "vendor:curl"
@@ -110,34 +111,32 @@ get_commit :: proc(raw_url: string, allocator := context.allocator) -> (string, 
 		return "", false
 	}
 
-	response := strings.to_string(b)
+	response := b.buf[:]
 
-	// Parse the JSON manually by searching for `"sha":`
-	sha_idx := strings.index(response, "\"sha\":")
-	if sha_idx == -1 {
-		fmt.eprintln("Could not find commit hash in GitHub API response")
+	json_data, err := json.parse(response)
+	if err != nil {
+		fmt.eprintln("Could not parse JSON response")
+		return "", false
+	}
+	defer json.destroy_value(json_data)
+
+	root_array, is_array := json_data.(json.Array)
+	if !is_array || len(root_array) == 0 {
+		fmt.eprintln("Invalid JSON response or no commits found")
 		return "", false
 	}
 
-	// Skip `"sha":` and the following `"`
-	// `"sha": "..."`
-	// 012345678
-	start_idx := sha_idx + 6 // after `"sha":`
-
-	// Find the start quote
-	quote_start := strings.index(response[start_idx:], "\"")
-	if quote_start == -1 {
-		return "", false
-	}
-	start_idx += quote_start + 1
-
-	quote_end := strings.index(response[start_idx:], "\"")
-	if quote_end == -1 {
+	first_commit_obj, is_obj := root_array[0].(json.Object)
+	if !is_obj {
 		return "", false
 	}
 
-	commit_hash := response[start_idx:start_idx + quote_end]
-	return strings.clone(commit_hash), true
+	sha_val, has_sha := first_commit_obj["sha"].(json.String)
+	if !has_sha {
+		return "", false
+	}
+
+	return strings.clone(string(sha_val), allocator), true
 }
 
 get_compare_status :: proc(raw_url: string, current_commit: string, target_commit: string, allocator := context.allocator) -> (string, bool) {
@@ -184,28 +183,26 @@ get_compare_status :: proc(raw_url: string, current_commit: string, target_commi
 		return "", false
 	}
 
-	response := strings.to_string(b)
+	response := b.buf[:]
 
-	status_idx := strings.index(response, "\"status\":")
-	if status_idx == -1 {
+	json_data, err := json.parse(response)
+	if err != nil {
+		fmt.eprintln("Could not parse JSON response for compare status")
+		return "", false
+	}
+	defer json.destroy_value(json_data)
+
+	root_obj, is_obj := json_data.(json.Object)
+	if !is_obj {
 		return "", false
 	}
 
-	start_idx := status_idx + 9 // after `"status":`
-
-	quote_start := strings.index(response[start_idx:], "\"")
-	if quote_start == -1 {
-		return "", false
-	}
-	start_idx += quote_start + 1
-
-	quote_end := strings.index(response[start_idx:], "\"")
-	if quote_end == -1 {
+	status_val, has_status := root_obj["status"].(json.String)
+	if !has_status {
 		return "", false
 	}
 
-	status_str := response[start_idx:start_idx + quote_end]
-	return strings.clone(status_str, allocator), true
+	return strings.clone(string(status_val), allocator), true
 }
 
 
