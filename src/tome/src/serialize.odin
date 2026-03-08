@@ -9,24 +9,20 @@ Indent_Type :: enum {
 }
 
 Serialize_Options :: struct {
-	max_inline_items:      int,
+	max_inline_items: int,
 	max_inline_properties: int,
-	indent_type:           Indent_Type,
-	indent_count:          int,
+	indent_type: Indent_Type,
+	indent_count: int,
 }
 
-DEFAULT_SERIALIZE_OPTIONS :: Serialize_Options {
-	max_inline_items      = 5,
+DEFAULT_SERIALIZE_OPTIONS :: Serialize_Options{
+	max_inline_items = 5,
 	max_inline_properties = 3,
-	indent_type           = .Tabs,
-	indent_count          = 1,
+	indent_type = .Tabs,
+	indent_count = 1,
 }
 
-serialize :: proc(
-	obj: Object,
-	allocator := context.allocator,
-	options := DEFAULT_SERIALIZE_OPTIONS,
-) -> string {
+serialize :: proc(obj: Object, allocator := context.allocator, options := DEFAULT_SERIALIZE_OPTIONS) -> string {
 	builder := strings.builder_make(allocator)
 
 	first := true
@@ -46,7 +42,7 @@ serialize :: proc(
 
 @(private)
 write_indent :: proc(builder: ^strings.Builder, options: Serialize_Options, level: int) {
-	for _ in 0 ..< (level * options.indent_count) {
+	for _ in 0..<(level * options.indent_count) {
 		if options.indent_type == .Tabs {
 			strings.write_string(builder, "\t")
 		} else {
@@ -56,12 +52,7 @@ write_indent :: proc(builder: ^strings.Builder, options: Serialize_Options, leve
 }
 
 @(private)
-serialize_value :: proc(
-	builder: ^strings.Builder,
-	val: Value,
-	options: Serialize_Options,
-	indent_level: int,
-) {
+serialize_value :: proc(builder: ^strings.Builder, val: Value, options: Serialize_Options, indent_level: int) {
 	switch v in val {
 	case Integer:
 		fmt.sbprintf(builder, "%d", v)

@@ -1,2 +1,4 @@
 version=1,
-deps=[{commit="d4b67b8842674179b95d374e276467cd24397c63", folder="src/tome", url="https://github.com/albizures/odin-tome"}]
+deps=[
+	{commit="91016dc9df4dbfea66139a0fc6c3a75e367c6ce9", folder="src/tome", url="https://github.com/albizures/odin-tome"},
+]

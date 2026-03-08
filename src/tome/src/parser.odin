@@ -71,7 +71,9 @@ parse_object_members :: proc(p: ^Parser) -> (result: Object) {
 	result = make(Object, p.allocator)
 	loop: for {
 
-		if p.curr_token.kind == .Close_Brace || p.curr_token.kind == .Close_Bracket || p.curr_token.kind == .EOF {
+		if p.curr_token.kind == .Close_Brace ||
+		   p.curr_token.kind == .Close_Bracket ||
+		   p.curr_token.kind == .EOF {
 			break loop
 		}
 

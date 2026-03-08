@@ -106,6 +106,7 @@ test_serialize_multiline_array :: proc(t: ^testing.T) {
 	result := tome.serialize(doc, context.temp_allocator)
 
 	expected := "test=[\n\t1,\n\t2,\n\t3,\n\t4,\n\t5,\n\t6,\n]"
+
 	testing.expect_value(t, result, expected)
 }
 
